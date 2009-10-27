@@ -1,23 +1,55 @@
 #include "../SDK/foobar2000.h"
 #include "../helpers/helpers.h"
+#include <stdio.h>
+
+#include <direct.h> // for getcwd
+#include <stdlib.h>// for MAX_PATH
 
 #define PLUGIN_NAME		"Foobar GNTP"
 #define PLUGIN_AUTHOR	"Daniel Dimovski <daniel.k.dimovski@gmail.com>"
 #define PLUGIN_DESC		"Plugin sends foobar notifications to Growl."
-#define ICON_PATH 		"C:/Program Files (x86)/foobar2000/components/foobar2000.png"
 #define VERSION			"0.1"
 #define SERVER_IP 		"127.0.0.1:23053"
 
+char CurrentPath[_MAX_PATH];
+
 char* notifications[] = {
-	"Track Change"
+	"Playback Started",
+	"Playback Stopped",
+	"Playback Paused"
 };
 
 #include "gntp-send.h"
 
 using namespace pfc;
 
-void playback_stopped()
+void growl(char* type, char* title, char* notice)
 {
+	gntp_register(NULL);
+	gntp_notify(type, CurrentPath, title, notice, NULL);
+}
+
+void playback_stopped(play_control::t_stop_reason p_reason)
+{
+	switch ( p_reason )
+	{
+		case play_control::t_stop_reason::stop_reason_user : 
+			growl("Playback Stopped", "Playback Stopped", "Stopped by user");
+			break;
+		case play_control::t_stop_reason::stop_reason_eof : 
+			growl("Playback Stopped", "Playback Stopped", "Reached end of playlist");
+			break;
+		case play_control::t_stop_reason::stop_reason_starting_another : 
+			//growl("starting new one");
+			break;
+		case play_control::t_stop_reason::stop_reason_shutting_down : 
+			growl("Playback Stopped", "Playback Stopped", "Foobar2000 shutting down");
+			break;
+		case 5 : 
+			growl("Playback Paused", "Playback Paused", "Paused by user");
+			break;
+	}
+
 }
 
 void playback_new_track(metadb_handle_ptr track)
@@ -50,9 +82,9 @@ void playback_new_track(metadb_handle_ptr track)
 	strcat (message, album.toString());
 	strcat (message, "\n");
 	strcat (message, title.toString());
-
-	gntp_register(NULL);
-	gntp_notify("Track Change", ICON_PATH, "Track Change", message, NULL);
+	
+	growl("Playback Started", "Playback Started", message);
+	delete[] message;
 }
 
 class play_callback_gntp : public play_callback_static
@@ -64,13 +96,13 @@ class play_callback_gntp : public play_callback_static
 	}
 	virtual void on_playback_stop(play_control::t_stop_reason p_reason)
 	{
-		playback_stopped();
+		playback_stopped(p_reason);
 	}
 	virtual void on_playback_seek(double p_time) {}
 	virtual void on_playback_pause(bool p_state)
 	{
 		if (p_state)
-			playback_stopped();
+			playback_stopped((play_control::t_stop_reason)5);
 		else
 		{
 			metadb_handle_ptr track;
@@ -86,15 +118,13 @@ class play_callback_gntp : public play_callback_static
 	virtual void on_playback_dynamic_info(const file_info & info) {}
 	virtual void on_playback_dynamic_info_track(const file_info & info) {}
 	virtual void on_playback_time(double p_time) {}
-	virtual void on_volume_change(float p_new_val) {};
-	
+	virtual void on_volume_change(float p_new_val) {}
 	virtual unsigned get_flags() 
 	{
 		return flag_on_playback_new_track | flag_on_playback_pause | flag_on_playback_stop;
 	}
-
 };
 
-static play_callback_static_factory_t<play_callback_gntp> msn_callback_factory;
+static play_callback_static_factory_t<play_callback_gntp> gntp_callback_factory;
 
 DECLARE_COMPONENT_VERSION(PLUGIN_NAME,VERSION,0)

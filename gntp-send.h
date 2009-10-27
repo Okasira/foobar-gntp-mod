@@ -476,20 +476,23 @@ gntp_register(char* password)
 		#endif
 		return;
 	}
+	
+	getcwd(CurrentPath, _MAX_PATH);
+	strcat (CurrentPath, "/icons/foobar2000.png");
 
 	sendline(sock, "GNTP/1.0 REGISTER NONE", authheader);
 	sendline(sock, "Application-Name: ", PLUGIN_NAME);
-	sendline(sock, "Application-Icon: ", ICON_PATH);
+	sendline(sock, "Application-Icon: ", CurrentPath);
 	
-	sendline(sock, "Notifications-Count: 1", NULL);
+	sendline(sock, "Notifications-Count: 3", NULL);
 
-	for(;it < 1; it++ )
+	for(;it < 3; it++ )
 	{
 		sendline(sock, "", NULL);
 		sendline(sock, "Notification-Name: ", notifications[it]);
 		sendline(sock, "Notification-Display-Name: ", notifications[it]);
 		sendline(sock, "Notification-Enabled: True", NULL);
-		sendline(sock, "Notification-Icon: file://", ICON_PATH);
+		sendline(sock, "Notification-Icon: file://", CurrentPath);
 		
 		sendline(sock, "\n\r", NULL);
 	}
@@ -544,7 +547,6 @@ gntp_notify(char* notify, char* icon, char* title, char* message, char* password
 	sendline(sock, "Notification-Title: ", title);
 	sendline(sock, "Notification-Text: ", message);
 	if (icon) sendline(sock, "Notification-Icon: ", icon);
-	else sendline(sock, "Notification-Icon: ", ICON_PATH);
 	sendline(sock, "", NULL);
 
 	gntp_parse_response(sock);
