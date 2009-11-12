@@ -476,7 +476,7 @@ gntp_register(char* password)
 		#endif
 		return;
 	}
-	
+
 	getcwd(CurrentPath, _MAX_PATH);
 	strcat (CurrentPath, "/icons/foobar2000.png");
 
@@ -492,7 +492,7 @@ gntp_register(char* password)
 		sendline(sock, "Notification-Name: ", notifications[it]);
 		sendline(sock, "Notification-Display-Name: ", notifications[it]);
 		sendline(sock, "Notification-Enabled: True", NULL);
-		sendline(sock, "Notification-Icon: file://", CurrentPath);
+		sendline(sock, "Notification-Icon: ", CurrentPath);
 		
 		sendline(sock, "\n\r", NULL);
 	}

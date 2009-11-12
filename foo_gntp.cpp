@@ -5,13 +5,16 @@
 #include <direct.h> // for getcwd
 #include <stdlib.h>// for MAX_PATH
 
+#include <fstream>
+
 #define PLUGIN_NAME		"Foobar GNTP"
 #define PLUGIN_AUTHOR	"Daniel Dimovski <daniel.k.dimovski@gmail.com>"
 #define PLUGIN_DESC		"Plugin sends foobar notifications to Growl."
-#define VERSION			"0.1"
+#define VERSION			"0.2"
 #define SERVER_IP 		"127.0.0.1:23053"
 
 char CurrentPath[_MAX_PATH];
+char AlbumArtPath[_MAX_PATH];
 
 char* notifications[] = {
 	"Playback Started",
@@ -23,10 +26,15 @@ char* notifications[] = {
 
 using namespace pfc;
 
-void growl(char* type, char* title, char* notice)
+void growl(char* type, char* title, char* notice, const void* imgdata)
 {
 	gntp_register(NULL);
-	gntp_notify(type, CurrentPath, title, notice, NULL);
+	if(imgdata == NULL)
+		gntp_notify(type, CurrentPath, title, notice, NULL);
+	else
+	{
+		gntp_notify(type, &AlbumArtPath[7], title, notice, NULL);
+	}
 }
 
 void playback_stopped(play_control::t_stop_reason p_reason)
@@ -34,19 +42,19 @@ void playback_stopped(play_control::t_stop_reason p_reason)
 	switch ( p_reason )
 	{
 		case play_control::t_stop_reason::stop_reason_user : 
-			growl("Playback Stopped", "Playback Stopped", "Stopped by user");
+			growl("Playback Stopped", "Playback Stopped", "Stopped by user", NULL);
 			break;
 		case play_control::t_stop_reason::stop_reason_eof : 
-			growl("Playback Stopped", "Playback Stopped", "Reached end of playlist");
+			growl("Playback Stopped", "Playback Stopped", "Reached end of playlist", NULL);
 			break;
 		case play_control::t_stop_reason::stop_reason_starting_another : 
 			//growl("starting new one");
 			break;
 		case play_control::t_stop_reason::stop_reason_shutting_down : 
-			growl("Playback Stopped", "Playback Stopped", "Foobar2000 shutting down");
+			growl("Playback Stopped", "Playback Stopped", "Foobar2000 shutting down", NULL);
 			break;
 		case 5 : 
-			growl("Playback Paused", "Playback Paused", "Paused by user");
+			growl("Playback Paused", "Playback Paused", "Paused by user", NULL);
 			break;
 	}
 
@@ -57,6 +65,33 @@ void playback_new_track(metadb_handle_ptr track)
 	if (track.is_empty())
 		return;
 		
+	AlbumArtPath[0] = '\0';
+	strcat (AlbumArtPath, core_api::get_profile_path());
+	strcat (AlbumArtPath, "/album_art.tmp");
+
+	abort_callback_dummy *dummy = new abort_callback_dummy(); // never aborts
+	album_art_manager_instance_ptr aamip = static_api_ptr_t<album_art_manager>()->instantiate();
+	aamip->open(track->get_path(),*dummy);
+	album_art_data_ptr art = NULL;
+
+	const void *ptr;
+
+	try
+	{
+		art = aamip->query(album_art_ids::cover_front, *dummy);
+		ptr = art->get_ptr();
+
+		DeleteFileA(&AlbumArtPath[7]);
+		std::fstream the_file (&AlbumArtPath[7], std::ios::out | std::ios::binary);
+	    the_file.seekg (0);
+		the_file.write( reinterpret_cast<const char *>(art->get_ptr()), art->get_size());
+	    the_file.close();
+	}
+	catch(exception_album_art_not_found e)
+	{
+		ptr = NULL;
+	}
+
 	static_api_ptr_t<titleformat_compiler> compiler;
 	
 	string8 title;
@@ -74,16 +109,16 @@ void playback_new_track(metadb_handle_ptr track)
 	compiler->compile_safe(title_obj, "%album%");
 	track->format_title(NULL, album, title_obj, NULL);
 
-	int len = strlen(title.toString()) + strlen(artist.toString()) + strlen(album.toString()) + 3;
+	int len = strlen(title.toString()) + strlen(artist.toString()) + strlen(album.toString()) + 5;
 	char *message = new char[len];
 
 	strcpy(message, artist.toString());
-	strcat (message, "\n");
-	strcat (message, album.toString());
-	strcat (message, "\n");
+	strcat (message, "\n\"");
 	strcat (message, title.toString());
+	strcat (message, "\"\n");
+	strcat (message, album.toString());
 	
-	growl("Playback Started", "Playback Started", message);
+	growl("Playback Started", "Playback Started", message, ptr );
 	delete[] message;
 }
 
