@@ -94,16 +94,16 @@ void playback_stopped(play_control::t_stop_reason p_reason)
 {
 	switch ( p_reason )
 	{
-		case play_control::t_stop_reason::stop_reason_user : 
+		case play_control::stop_reason_user : 
 			growl("Playback Stopped", "Playback Stopped", "Stopped by user", NULL);
 			break;
-		case play_control::t_stop_reason::stop_reason_eof : 
+		case play_control::stop_reason_eof : 
 			growl("Playback Stopped", "Playback Stopped", "Reached end of playlist", NULL);
 			break;
-		case play_control::t_stop_reason::stop_reason_starting_another : 
+		case play_control::stop_reason_starting_another : 
 			//growl("starting new one");
 			break;
-		case play_control::t_stop_reason::stop_reason_shutting_down : 
+		case play_control::stop_reason_shutting_down : 
 			growl("Playback Stopped", "Playback Stopped", "Foobar2000 shutting down", NULL);
 			break;
 		case 5 : 
@@ -138,18 +138,18 @@ void playback_new_track(metadb_handle_ptr track)
 	int len = strlen(title.toString()) + strlen(artist.toString()) + strlen(album.toString()) + 5;
 	char *message = new char[len];
 
-	strcpy (message, artist.toString());
-	strcat (message, "\n\"");
-	strcat (message, title.toString());
-	strcat (message, "\"\n");
-	strcat (message, album.toString());
+	strcpy_s(message, len, artist.toString());
+	strcat_s (message, len, "\n\"");
+	strcat_s (message, len, title.toString());
+	strcat_s (message, len, "\"\n");
+	strcat_s (message, len, album.toString());
 	
 	DeleteFileA(&AlbumArtPath[7]);	
 
 	AlbumArtPath[0] = '\0';
-	strcat (AlbumArtPath, core_api::get_profile_path());
-	strcat (AlbumArtPath, "/");
-	strcat (AlbumArtPath, title.toString());
+	strcat_s (AlbumArtPath, core_api::get_profile_path());
+	strcat_s (AlbumArtPath, "/");
+	strcat_s (AlbumArtPath, title.toString());
 	
 	abort_callback_dummy *dummy = new abort_callback_dummy(); // never aborts
 	album_art_manager_instance_ptr aamip = static_api_ptr_t<album_art_manager>()->instantiate();
