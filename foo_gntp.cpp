@@ -7,33 +7,86 @@
 
 #include <fstream>
 
+using namespace pfc;
+
 #define PLUGIN_NAME		"Foobar GNTP"
 #define PLUGIN_AUTHOR	"Daniel Dimovski <daniel.k.dimovski@gmail.com>"
-#define PLUGIN_DESC		"Plugin sends foobar notifications to Growl."
-#define VERSION			"0.2"
+#define PLUGIN_DESC		"Plugin sends Foobar notifications to Growl."
+#define VERSION			"0.2.2"
 #define SERVER_IP 		"127.0.0.1:23053"
 
 char CurrentPath[_MAX_PATH];
 char AlbumArtPath[_MAX_PATH];
 
-char* notifications[] = {
+const char* notifications[] = {
 	"Playback Started",
 	"Playback Stopped",
 	"Playback Paused"
 };
 
-#include "gntp-send.h"
+typedef int (__cdecl* GROWL_REGISTER)(const char *const server , const char *const appname ,
+	const char **const notifications , const int notifications_count , const char *const password, const char* icon_path);
 
-using namespace pfc;
+typedef int (__cdecl* GROWL_NOTIFY)(const char *const server,const char *const appname,const char *const notify,const char *const title, const char *const message ,
+                                const char *const password, const char* const url, const char* const icon);
 
-void growl(char* type, char* title, char* notice, const void* imgdata)
+GROWL_REGISTER growl_register;   // Function pointer
+GROWL_NOTIFY growl_notify;    	// Function pointer
+
+static bool connected = false;
+static bool registered = false;
+
+void connect_to_dll()
 {
-	gntp_register(NULL);
-	if(imgdata == NULL)
-		gntp_notify(type, CurrentPath, title, notice, NULL);
+	if(connected)
+		return;
+	
+	
+	HMODULE hDLL;               // Handle to DLL
+	hDLL = LoadLibraryA("growl.dll");
+	if (hDLL != NULL)
+	{
+	   growl_register = (GROWL_REGISTER)GetProcAddress(hDLL, "growl_tcp_register");
+	   growl_notify = (GROWL_NOTIFY)GetProcAddress(hDLL, "growl_tcp_notify");
+
+	   if (!growl_register || !growl_notify)
+	   {
+		  popup_message::g_show("Failed to fetch functions from growl.dll","Foobar-GNTP");
+	      FreeLibrary(hDLL);       
+	   }
+	   else
+	   {	
+		   connected = true;
+	   }
+	}
 	else
 	{
-		gntp_notify(type, &AlbumArtPath[7], title, notice, NULL);
+		  popup_message::g_show("Failed to load growl.dll","Foobar-GNTP");
+	}
+}
+
+void growl(char* type, char* title, char* notice, bool hasAlbumArt)
+{
+	connect_to_dll();
+
+	if(!registered)
+	{
+		_getcwd(CurrentPath, _MAX_PATH);
+		strcat_s(CurrentPath, "/icons/foobar2000.png");
+
+		if(growl_register)
+		{
+			growl_register(SERVER_IP, PLUGIN_NAME, static_cast<const char **const>(notifications), 3, 0, CurrentPath);
+			registered = true;
+		}
+	}
+
+	if(growl_notify)
+	{
+		if(!hasAlbumArt)
+			growl_notify(SERVER_IP, PLUGIN_NAME, type, title, notice, NULL, NULL, CurrentPath);
+		else
+			growl_notify(SERVER_IP, PLUGIN_NAME, type, title, notice, NULL, NULL, &AlbumArtPath[7]);
 	}
 }
 
@@ -65,33 +118,6 @@ void playback_new_track(metadb_handle_ptr track)
 	if (track.is_empty())
 		return;
 		
-	AlbumArtPath[0] = '\0';
-	strcat (AlbumArtPath, core_api::get_profile_path());
-	strcat (AlbumArtPath, "/album_art.tmp");
-
-	abort_callback_dummy *dummy = new abort_callback_dummy(); // never aborts
-	album_art_manager_instance_ptr aamip = static_api_ptr_t<album_art_manager>()->instantiate();
-	aamip->open(track->get_path(),*dummy);
-	album_art_data_ptr art = NULL;
-
-	const void *ptr;
-
-	try
-	{
-		art = aamip->query(album_art_ids::cover_front, *dummy);
-		ptr = art->get_ptr();
-
-		DeleteFileA(&AlbumArtPath[7]);
-		std::fstream the_file (&AlbumArtPath[7], std::ios::out | std::ios::binary);
-	    the_file.seekg (0);
-		the_file.write( reinterpret_cast<const char *>(art->get_ptr()), art->get_size());
-	    the_file.close();
-	}
-	catch(exception_album_art_not_found e)
-	{
-		ptr = NULL;
-	}
-
 	static_api_ptr_t<titleformat_compiler> compiler;
 	
 	string8 title;
@@ -112,13 +138,42 @@ void playback_new_track(metadb_handle_ptr track)
 	int len = strlen(title.toString()) + strlen(artist.toString()) + strlen(album.toString()) + 5;
 	char *message = new char[len];
 
-	strcpy(message, artist.toString());
+	strcpy (message, artist.toString());
 	strcat (message, "\n\"");
 	strcat (message, title.toString());
 	strcat (message, "\"\n");
 	strcat (message, album.toString());
 	
-	growl("Playback Started", "Playback Started", message, ptr );
+	DeleteFileA(&AlbumArtPath[7]);	
+
+	AlbumArtPath[0] = '\0';
+	strcat (AlbumArtPath, core_api::get_profile_path());
+	strcat (AlbumArtPath, "/");
+	strcat (AlbumArtPath, title.toString());
+	
+	abort_callback_dummy *dummy = new abort_callback_dummy(); // never aborts
+	album_art_manager_instance_ptr aamip = static_api_ptr_t<album_art_manager>()->instantiate();
+	aamip->open(track->get_path(),*dummy);
+	album_art_data_ptr art = NULL;
+
+	const void *ptr;
+
+	try
+	{
+		art = aamip->query(album_art_ids::cover_front, *dummy);
+		ptr = art->get_ptr();
+
+		std::fstream the_file (&AlbumArtPath[7], std::ios::out | std::ios::binary);
+	    the_file.seekg (0);
+		the_file.write( reinterpret_cast<const char *>(art->get_ptr()), art->get_size());
+	    the_file.close();
+	}
+	catch(exception_album_art_not_found e)
+	{
+		ptr = NULL;
+	}
+	
+	growl("Playback Started", "Playback Started", message, ptr ? true : false );
 	delete[] message;
 }
 
