@@ -21,11 +21,13 @@ using namespace pfc;
 #define VERSION			"0.2.2.1"
 #define SERVER_IP 		"localhost:23053"
 #define	ICON_PATH		"\\icons\\foobar2000.png"
+#define ALBUM_ART_PATH	"\\AlbumArtTemp"
 
 DECLARE_COMPONENT_VERSION( PLUGIN_NAME, VERSION, "" )
 
 char CurrentPath[_MAX_PATH];
 char AlbumArtPath[_MAX_PATH];
+wchar_t AlbumArtPathW[_MAX_PATH];
 
 const char* GrowlNotifies[] = {
 	"Playback Started",
@@ -40,8 +42,14 @@ void send_growl( char* type, char* title, char* notice, bool hasAlbumArt )
 {
 	if( GrowlClient == NULL )
 	{
+		AlbumArtPath[0] = '\0';
+		strcat_s( AlbumArtPath, core_api::get_profile_path() );
+		strcat_s( AlbumArtPath, ALBUM_ART_PATH );
+		MultiByteToWideChar( CP_UTF8, 0, &AlbumArtPath[7], -1, AlbumArtPathW, _MAX_PATH );
+
 		_getcwd( CurrentPath, _MAX_PATH );
 		strcat_s( CurrentPath, ICON_PATH );
+
 		GrowlClient = new Growl( GROWL_TCP, SERVER_IP, "", PLUGIN_NAME, GrowlNotifies, 4, CurrentPath );
 	}
 
@@ -51,7 +59,7 @@ void send_growl( char* type, char* title, char* notice, bool hasAlbumArt )
 		{
 			GrowlClient->Notify( type, title, notice, "", CurrentPath );
 		} else {
-			GrowlClient->Notify( type, title, notice, "", &AlbumArtPath[7] );
+			GrowlClient->Notify( type, title, notice, "", AlbumArtPath );
 		}
 	}
 }
@@ -61,19 +69,19 @@ void playback_stopped( play_control::t_stop_reason p_reason )
 	switch ( p_reason )
 	{
 		case play_control::stop_reason_user : 
-			send_growl( "Playback Stopped", "Playback Stopped", "Stopped by user", NULL );
+			send_growl( "Playback Stopped", "Playback Stopped", "Stopped by user", false );
 			break;
 		case play_control::stop_reason_eof : 
-			send_growl( "Playback Stopped", "Playback Stopped", "Reached end of playlist", NULL );
+			send_growl( "Playback Stopped", "Playback Stopped", "Reached end of playlist", false );
 			break;
 		case play_control::stop_reason_starting_another : 
 			//send_growl( "starting new one" );
 			break;
 		case play_control::stop_reason_shutting_down : 
-			send_growl( "Playback Stopped", "Playback Stopped", "Foobar2000 shutting down", NULL );
+			send_growl( "Playback Stopped", "Playback Stopped", "Foobar2000 shutting down", false );
 			break;
 		case 5 : 
-			send_growl( "Playback Paused", "Playback Paused", "Paused by user", NULL );
+			send_growl( "Playback Paused", "Playback Paused", "Paused by user", false );
 			break;
 	}
 
@@ -113,14 +121,7 @@ void playback_new_track( metadb_handle_ptr track )
 	strcat_s( message, len, title.toString() );
 	strcat_s( message, len, "\"\n");
 	strcat_s( message, len, album.toString() );
-	
-	DeleteFileA( &AlbumArtPath[7] );
 
-	AlbumArtPath[0] = '\0';
-	strcat_s( AlbumArtPath, core_api::get_profile_path() );
-	strcat_s( AlbumArtPath, "/" );
-	strcat_s( AlbumArtPath, title.toString() );
-	
 	abort_callback_dummy *dummy = new abort_callback_dummy(); // never aborts
 	album_art_manager_instance_ptr aamip = static_api_ptr_t<album_art_manager>()->instantiate();
 	aamip->open( track->get_path(), *dummy );
@@ -133,7 +134,7 @@ void playback_new_track( metadb_handle_ptr track )
 		art = aamip->query(album_art_ids::cover_front, *dummy);
 		ptr = art->get_ptr();
 
-		std::fstream the_file( &AlbumArtPath[7], std::ios::out | std::ios::binary );
+		std::fstream the_file( AlbumArtPathW, std::ios::out | std::ios::binary );
 	    the_file.seekg( 0 );
 		the_file.write( reinterpret_cast<const char *>( art->get_ptr() ), art->get_size() );
 	    the_file.close();
@@ -144,6 +145,7 @@ void playback_new_track( metadb_handle_ptr track )
 	}
 	
 	send_growl( "Playback Started", "Playback Started", message, ptr ? true : false );
+	DeleteFile( AlbumArtPathW );
 	delete[] message;
 }
 
@@ -168,8 +170,8 @@ void stream_track_changed(const file_info & info)
 
 	len += 5;
 
-	char *message = new char[len];
-	memset( message, '\0', len );
+	char	*message = new char[len];
+	memset( message, 0, len );
 
 	if( info.meta_get( "TITLE", 0 ) != NULL )
 	{
@@ -185,7 +187,7 @@ void stream_track_changed(const file_info & info)
 	{
 		strcat_s( message, len, info.meta_get( "ALBUM", 0 ) );
 	}
-	
+
 	send_growl("Playback Changed to New Track", "Playback Changed to New Track", message, false );
 	delete[] message;
 
