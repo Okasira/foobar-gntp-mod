@@ -4,14 +4,18 @@
 
 #define	DEFAULT_IP_ADDRESS	"127.0.0.1"
 #define DEFAULT_PORT_NUMBER	"23053"
+#define DEFAULT_FORMAT "%title%$crlf()%artist%$crlf()%album%"
 
 // {53ADD5E5-4845-43C9-B91B-FCCD04CB763A}
 static const GUID guid_cfg_ip_address = { 0x53add5e5, 0x4845, 0x43c9, { 0xb9, 0x1b, 0xfc, 0xcd, 0x4, 0xcb, 0x76, 0x3a } };
 // {301E47B7-300A-467D-BBDE-0E981C9FE91B}
 static const GUID guid_cfg_port_number = { 0x301e47b7, 0x300a, 0x467d, { 0xbb, 0xde, 0xe, 0x98, 0x1c, 0x9f, 0xe9, 0x1b } };
+// {AD02AEA4-8AED-4129-A084-6B1DCC15BEE8}
+static const GUID guid_cfg_format_string = { 0xad02aea4, 0x8aed, 0x4129, { 0xa0, 0x84, 0x6b, 0x1d, 0xcc, 0x15, 0xbe, 0xe8 } };
 
 cfg_string cfg_ip_address( guid_cfg_ip_address, DEFAULT_IP_ADDRESS );
 cfg_string cfg_port_number( guid_cfg_port_number, DEFAULT_PORT_NUMBER );
+cfg_string cfg_format_string( guid_cfg_format_string, DEFAULT_FORMAT );
 
 
 bool string8ToWChar( pfc::string8 in, wchar_t *u16buff, t_size buffsize )
@@ -84,8 +88,9 @@ public:
 	//WTL message map
 	BEGIN_MSG_MAP(CGntpPreference)
 		MSG_WM_INITDIALOG(OnInitDialog)
-		COMMAND_HANDLER_EX(IDC_EDIT1, EN_CHANGE, OnEditChange)
-		COMMAND_HANDLER_EX(IDC_EDIT2, EN_CHANGE, OnEditChange)
+		COMMAND_HANDLER_EX(IDC_IP_EDIT, EN_CHANGE, OnEditChange)
+		COMMAND_HANDLER_EX(IDC_PORT_EDIT, EN_CHANGE, OnEditChange)
+		COMMAND_HANDLER_EX(IDC_FORMAT_EDIT, EN_CHANGE, OnEditChange)
 	END_MSG_MAP()
 
 private:
@@ -105,13 +110,20 @@ BOOL CGntpPreference::OnInitDialog(CWindow, LPARAM)
 
 	if( string8ToWChar( cfg_ip_address, buff, buffsize ) )
 	{
-		SetDlgItemText( IDC_EDIT1, buff );
+		SetDlgItemText( IDC_IP_EDIT, buff );
 	}
 
 	if( string8ToWChar( cfg_port_number, buff, buffsize ) )
 	{
-		SetDlgItemText( IDC_EDIT2, buff );
+		SetDlgItemText( IDC_PORT_EDIT, buff );
 	}
+
+	if( string8ToWChar( cfg_format_string, buff, buffsize ) )
+	{
+		SetDlgItemText( IDC_FORMAT_EDIT, buff );
+	}
+
+
 	return FALSE;
 }
 
@@ -136,12 +148,17 @@ void CGntpPreference::reset()
 
 	if( string8ToWChar( cfg_ip_address, buff, buffsize ) )
 	{
-		SetDlgItemText( IDC_EDIT1, buff );
+		SetDlgItemText( IDC_IP_EDIT, buff );
 	}
 
 	if( string8ToWChar( cfg_port_number, buff, buffsize ) )
 	{
-		SetDlgItemText( IDC_EDIT2, buff );
+		SetDlgItemText( IDC_PORT_EDIT, buff );
+	}
+
+	if( string8ToWChar( cfg_format_string, buff, buffsize ) )
+	{
+		SetDlgItemText( IDC_FORMAT_EDIT, buff );
 	}
 
 	OnChanged();
@@ -152,11 +169,13 @@ void CGntpPreference::apply()
 	const int buffsize = 1024;
 	wchar_t buff[buffsize];
 
-	GetDlgItemText( IDC_EDIT1, buff, buffsize );
+	GetDlgItemText( IDC_IP_EDIT, buff, buffsize );
 	WCharToString8( buff, &cfg_ip_address );
-	GetDlgItemText( IDC_EDIT2, buff, buffsize );
+	GetDlgItemText( IDC_PORT_EDIT, buff, buffsize );
 	WCharToString8( buff, &cfg_port_number );
-	
+	GetDlgItemText( IDC_FORMAT_EDIT, buff, buffsize );
+	WCharToString8( buff, &cfg_format_string );
+
 	OnChanged(); //our dialog content has not changed but the flags have - our currently shown values now match the settings so the apply button can be disabled
 }
 
@@ -168,14 +187,17 @@ bool CGntpPreference::HasChanged() {
 	pfc::string8 str8buff;
 	bool ret = false;
 
-	GetDlgItemText( IDC_EDIT1, buff, buffsize );
+	GetDlgItemText( IDC_IP_EDIT, buff, buffsize );
 	WCharToString8( buff, &str8buff );
 	ret= ret || ( str8buff != cfg_ip_address );
 
-	GetDlgItemText( IDC_EDIT2, buff, buffsize );
+	GetDlgItemText( IDC_PORT_EDIT, buff, buffsize );
 	WCharToString8( buff, &str8buff );
 	ret= ret || ( str8buff != cfg_port_number );
 
+	GetDlgItemText( IDC_FORMAT_EDIT, buff, buffsize );
+	WCharToString8( buff, &str8buff );
+	ret= ret || ( str8buff != cfg_format_string );
 	return ret;
 }
 

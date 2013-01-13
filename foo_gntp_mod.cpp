@@ -116,31 +116,16 @@ void playback_new_track( metadb_handle_ptr track )
 		
 	static_api_ptr_t<titleformat_compiler> compiler;
 	
-	string8 title;
-	string8 artist;
-	string8 album;
+	string8 track_info;
 
 	service_ptr_t<titleformat_object> title_obj;
-	
-	compiler->compile_safe( title_obj, "%title%" );
-	track->format_title( NULL, title, title_obj, NULL );
+	compiler->compile_safe( title_obj, cfg_format_string.get_ptr() );
+	track->format_title( NULL, track_info, title_obj, NULL );
 
-	compiler->compile_safe( title_obj, "%artist%" );
-	track->format_title( NULL, artist, title_obj, NULL );
-
-	compiler->compile_safe( title_obj, "%album%" );
-	track->format_title( NULL, album, title_obj, NULL );
-
-	int len =	strlen( title.toString() )  +
-				strlen( artist.toString() ) +
-				strlen( album.toString() )  + 5;
+	int len = strlen( track_info.toString() ) + 1;
 	char *message = new char[len];
-
-	strcpy_s( message, len, artist.toString() );
-	strcat_s( message, len, "\n\"" );
-	strcat_s( message, len, title.toString() );
-	strcat_s( message, len, "\"\n");
-	strcat_s( message, len, album.toString() );
+	message[0] = '\0';
+	strcpy_s( message, len, track_info.toString() );
 
 	AlbumArtPath[0] = '\0';
 	strcat_s( AlbumArtPath, core_api::get_profile_path() );
@@ -178,40 +163,18 @@ void stream_track_changed(const file_info & info)
 {
 	int len = 0;
 
-	if( info.meta_get( "TITLE", 0 ) != NULL )
-	{
-		len += strlen( info.meta_get( "TITLE", 0 ) );
-	}
+	static_api_ptr_t<playback_control> pbc;
+	static_api_ptr_t<titleformat_compiler> compiler;
+	service_ptr_t<titleformat_object> title_obj;
+	string8 track_info;
 
-	if( info.meta_get( "ARTIST", 0 ) != NULL )
-	{
-		len += strlen( info.meta_get( "ARTIST", 0 ) );
-	}
+	compiler->compile_safe( title_obj, cfg_format_string.get_ptr() );
+	pbc->playback_format_title( NULL, track_info, title_obj, NULL, playback_control::display_level_all );
+	len = strlen( track_info.toString() ) + 1;
 
-	if( info.meta_get( "ALBUM", 0 ) != NULL )
-	{
-		len += strlen( info.meta_get( "ALBUM", 0 ) );
-	}
-
-	len += 5;
-
-	char	*message = new char[len];
-	memset( message, 0, len );
-
-	if( info.meta_get( "TITLE", 0 ) != NULL )
-	{
-		strcat_s( message, len, info.meta_get( "TITLE", 0 ) );
-	}
-	strcat_s( message, len, "\n\"" );
-	if( info.meta_get( "ARTIST", 0 ) != NULL )
-	{
-		strcat_s( message, len, info.meta_get( "ARTIST", 0 ) );
-	}
-	strcat_s( message, len, "\n\"" );
-	if( info.meta_get( "ALBUM", 0 ) != NULL )
-	{
-		strcat_s( message, len, info.meta_get( "ALBUM", 0 ) );
-	}
+	char *message = new char[len];
+	message[0] = '\0';
+	strcpy_s( message, len, track_info.toString() );
 
 	send_growl("Playback Changed to New Track", "Playback Changed to New Track", message, false );
 	delete[] message;
