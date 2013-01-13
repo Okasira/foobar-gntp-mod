@@ -18,12 +18,13 @@ using namespace pfc;
 #define PLUGIN_NAME		"Foobar GNTP mod"
 #define PLUGIN_AUTHOR	"Kazumasa Suzuki <st202ss1@coffee.ocn.ne.jp>"
 #define PLUGIN_DESC		"Plugin sends Foobar notifications to Growl modified."
-#define VERSION			"0.2.2.1"
+#define VERSION			"0.2.2.mod1"
+#define ABOUT			"Foobar GNTP Plugin mod"
 #define SERVER_IP 		"localhost:23053"
 #define	ICON_PATH		"\\icons\\foobar2000.png"
 #define ALBUM_ART_PATH	"\\AlbumArtTemp"
 
-DECLARE_COMPONENT_VERSION( PLUGIN_NAME, VERSION, "" )
+DECLARE_COMPONENT_VERSION( PLUGIN_NAME, VERSION, ABOUT )
 
 char CurrentPath[_MAX_PATH];
 char AlbumArtPath[_MAX_PATH];
