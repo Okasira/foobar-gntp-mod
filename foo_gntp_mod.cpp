@@ -12,6 +12,8 @@
 #include	"../../SDK/foobar2000.h"
 #include	"../../helpers/helpers.h"
 
+#include	"foo_gntp_mod_preference.h"
+
 
 using namespace pfc;
 
@@ -20,7 +22,6 @@ using namespace pfc;
 #define PLUGIN_DESC		"Plugin sends Foobar notifications to Growl modified."
 #define VERSION			"0.2.2.mod1"
 #define ABOUT			"Foobar GNTP Plugin mod"
-#define SERVER_IP 		"localhost:23053"
 #define	ICON_PATH		"\\icons\\foobar2000.png"
 #define ALBUM_ART_PATH	"\\AlbumArtTemp"
 
@@ -39,19 +40,37 @@ const char* GrowlNotifies[] = {
 
 static Growl*	GrowlClient = NULL;
 
+void ResetGrowl( void )
+{
+	if( GrowlClient != NULL )
+	{
+		delete GrowlClient;
+		GrowlClient = NULL;
+	}
+}
+
 void send_growl( char* type, char* title, char* notice, bool hasAlbumArt )
 {
 	if( GrowlClient == NULL )
 	{
-		AlbumArtPath[0] = '\0';
-		strcat_s( AlbumArtPath, core_api::get_profile_path() );
-		strcat_s( AlbumArtPath, ALBUM_ART_PATH );
-		MultiByteToWideChar( CP_UTF8, 0, &AlbumArtPath[7], -1, AlbumArtPathW, _MAX_PATH );
-
 		_getcwd( CurrentPath, _MAX_PATH );
 		strcat_s( CurrentPath, ICON_PATH );
 
-		GrowlClient = new Growl( GROWL_TCP, SERVER_IP, "", PLUGIN_NAME, GrowlNotifies, 4, CurrentPath );
+		int ip_len = 0;
+		ip_len += cfg_ip_address.get_length();
+		ip_len++; // ":"
+		ip_len += cfg_port_number.get_length();
+		ip_len++; // \0
+		char*	server_ip = new char[ip_len];
+		server_ip[0] = '\0';
+
+		strcat_s( server_ip, ip_len, cfg_ip_address.get_ptr() );
+		strcat_s( server_ip, ip_len, ":" );
+		strcat_s( server_ip, ip_len, cfg_port_number.get_ptr() );
+
+		GrowlClient = new Growl( GROWL_TCP, server_ip, "", PLUGIN_NAME, GrowlNotifies, 4, CurrentPath );
+
+		delete [] server_ip;
 	}
 
 	if( GrowlClient != NULL )
@@ -122,6 +141,11 @@ void playback_new_track( metadb_handle_ptr track )
 	strcat_s( message, len, title.toString() );
 	strcat_s( message, len, "\"\n");
 	strcat_s( message, len, album.toString() );
+
+	AlbumArtPath[0] = '\0';
+	strcat_s( AlbumArtPath, core_api::get_profile_path() );
+	strcat_s( AlbumArtPath, ALBUM_ART_PATH );
+	MultiByteToWideChar( CP_UTF8, 0, &AlbumArtPath[7], -1, AlbumArtPathW, _MAX_PATH );
 
 	abort_callback_dummy *dummy = new abort_callback_dummy(); // never aborts
 	album_art_manager_instance_ptr aamip = static_api_ptr_t<album_art_manager>()->instantiate();
